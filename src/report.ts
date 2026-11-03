@@ -12,6 +12,9 @@ export interface LeaderRow {
   trades: number; winRate: number | null; avgWin: number | null; avgLoss: number | null; profitFactor: number | null;
   maxDD: number; sharpe: number; fees: number; slippage: number; tax: number; tdsLocked: number;
   equityAfter: number; equityBefore: number; open: boolean; rankAfter: number; rankBefore: number;
+  cash: number;                                   // tradable cash (after-tax ledger; excludes locked TDS)
+  pos: { qty: number; avgEntry: number; mark: number; value: number; unrealized: number; since: number } | null;
+  lots: [number, number, number][];               // open lots: [openTime, qty, entryPrice]
 }
 export interface Leaderboard {
   generatedAt: number;
@@ -28,6 +31,8 @@ export function buildLeaderboard(store: Store, cfg: Config, now: number): Leader
   const raw = store.loadBots().map(({ def, state }) => {
     const bot = new Bot(def, cfg, state);
     const curve = store.equityCurve(def.id);
+    const spk = store.getSpread(def.symbol);
+    const mark = spk ? (spk.bid + spk.ask) / 2 : bot.refPrice;
     let after: number, before: number;
     if (finished && curve.length) { const l = curve[curve.length - 1]; after = l.after; before = l.before; }
     else {
@@ -39,14 +44,14 @@ export function buildLeaderboard(store: Store, cfg: Config, now: number): Leader
     const ts = curve.map((c) => c.ts), eq = curve.map((c) => c.after);
     ts.push(t1); eq.push(after);
     const hourly = resampleHourly(ts, eq, run.startAt, t1, init);
-    return { def, bot, after, before, hourly };
+    return { def, bot, after, before, hourly, mark };
   });
   const bh = new Map<string, number>();
   for (const r of raw) if (r.def.strategy === 'buyAndHold') bh.set(`${r.def.symbol}|${r.def.fee}`, r.after / init - 1);
   const rnd = new Map<string, number[]>();
   for (const r of raw) if (r.def.strategy === 'random') { const k = `${r.def.symbol}|${r.def.interval}|${r.def.fee}`; (rnd.get(k) ?? rnd.set(k, []).get(k)!).push(r.after / init - 1); }
 
-  const rows: LeaderRow[] = raw.map(({ def, bot, after, before, hourly }) => {
+  const rows: LeaderRow[] = raw.map(({ def, bot, after, before, hourly, mark }) => {
     const st = bot.taxed.s.stats, tot = bot.taxed.s.totals;
     const ra = after / init - 1, ref = bh.get(`${def.symbol}|${def.fee}`) ?? 0;
     const rr = rnd.get(`${def.symbol}|${def.interval}|${def.fee}`);
@@ -59,6 +64,10 @@ export function buildLeaderboard(store: Store, cfg: Config, now: number): Leader
       maxDD: maxDrawdown(hourly), sharpe: sharpeHourly(hourly),
       fees: tot.fees, slippage: tot.slippage, tax: tot.tax, tdsLocked: bot.taxed.s.tdsLocked,
       equityAfter: after, equityBefore: before, open: bot.taxed.hasPosition, rankAfter: 0, rankBefore: 0,
+      cash: bot.taxed.s.cash,
+      pos: bot.taxed.hasPosition ? { qty: bot.taxed.qty, avgEntry: bot.taxed.avgEntry, mark, value: bot.taxed.qty * mark,
+        unrealized: bot.taxed.qty * (mark - bot.taxed.avgEntry), since: Math.min(...bot.taxed.s.lots.map((l) => l.time)) } : null,
+      lots: bot.taxed.s.lots.map((l) => [l.time, l.qty, l.price] as [number, number, number]),
     };
   });
   [...rows].sort((a, b) => b.retAfter - a.retAfter).forEach((r, i) => (r.rankAfter = i + 1));
