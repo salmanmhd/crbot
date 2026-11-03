@@ -108,8 +108,13 @@ jobs:
         run: |
           STATUS=$(cat status.txt)
           if [ "$STATUS" = "ok" ] && [ "$CHAIN" = "1" ]; then
-            gh workflow run paper-tick.yml --ref "${GITHUB_REF_NAME}" -f action=tick
-            echo "next run dispatched (queued behind this one by the concurrency group)"
+            if gh workflow run tick.yml --ref "${GITHUB_REF_NAME}" -f action=tick; then
+              echo "next run dispatched (queued behind this one by the concurrency group)"
+            else
+              echo "::warning title=Chain failed::could not dispatch the next run (the 5-minute cron is the fallback)"
+            fi
+          else
+            echo "not chaining (status=$STATUS chain=$CHAIN)"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
