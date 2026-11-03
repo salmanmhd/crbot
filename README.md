@@ -114,7 +114,7 @@ When 48 h are up the workflow publishes the final report (`/report/final.html`) 
 
 How it stays safe: `concurrency: paper-lab-state` (never two runs at once) · every tick is a catch-up tick · state is committed to the `paper-state` branch as a **single orphan commit that is force-pushed** (otherwise ~576 × 5 MB of history would pile up; set repo variable `KEEP_HISTORY=1` for ordinary commits) · the dashboard deploys from the same run, **without** the database.
 
-Optional knobs (repo *Variables*): `LOOP_SECONDS=240` → each run ticks every minute for 4 minutes (near-continuous coverage, fills at the real bookTicker; public repos only — it uses ~5× the runner minutes) · `PAPER_PROVIDER`, `PAPER_MAX_BOTS`, `PAPER_RUN_HOURS`.
+Each run ticks every minute for 4 minutes (`LOOP_SECONDS`, default 240 → fills at the real bookTicker), publishes, then **dispatches the next run itself** (`CHAIN=1`), so the experiment does not depend on GitHub's unreliable cron; the 5-minute cron is only a backup. This uses roughly continuous runner time (~48 h) — free on public repos; on a private repo set `LOOP_SECONDS=0` and `CHAIN=0`. Other repo *Variables*: `PAPER_PROVIDER`, `PAPER_MAX_BOTS`, `PAPER_RUN_HOURS`.
 `reset` (type `RESET`) deletes the state branch to start over. Pages can also be served straight from the `paper-state` branch root (Settings → Pages → Deploy from a branch) if you prefer.
 
 ### B. VPS with Docker

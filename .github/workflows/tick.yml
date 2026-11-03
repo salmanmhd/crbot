@@ -30,8 +30,12 @@ permissions:
 
 env:
   ACTION: ${{ github.event.inputs.action || 'tick' }}
-  # Optional: set repo variable LOOP_SECONDS=240 (public repos) to tick every minute inside each run => on-time fills.
-  LOOP_SECONDS: ${{ vars.LOOP_SECONDS || '0' }}
+  # Each run ticks every minute for LOOP_SECONDS (=> fills at the real bookTicker), then hands off to the next run.
+  # Set repo variable LOOP_SECONDS=0 for the old single-tick-per-run behaviour (e.g. on a private repo with limited minutes).
+  LOOP_SECONDS: ${{ vars.LOOP_SECONDS || '240' }}
+  # CHAIN=1: every successful run dispatches the next one, so the experiment does not depend on GitHub's flaky cron.
+  # (The 5-minute cron stays as a backup; the concurrency group + single pending slot stop chains from multiplying.)
+  CHAIN: ${{ vars.CHAIN || '1' }}
   KEEP_HISTORY: ${{ vars.KEEP_HISTORY || '0' }}
   PAPER_PROVIDER: ${{ vars.PAPER_PROVIDER || 'binance' }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -97,6 +101,18 @@ jobs:
         if: steps.run.outputs.publish == 'true' && steps.run.outputs.site == 'true'
         with:
           path: site
+
+      - name: Chain the next run (does not depend on cron)
+        if: steps.run.outputs.publish == 'true' && env.ACTION != 'backtest'
+        continue-on-error: true
+        run: |
+          STATUS=$(cat status.txt)
+          if [ "$STATUS" = "ok" ] && [ "$CHAIN" = "1" ]; then
+            gh workflow run paper-tick.yml --ref "${GITHUB_REF_NAME}" -f action=tick
+            echo "next run dispatched (queued behind this one by the concurrency group)"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stop the schedule after the 48h run has finished
         if: steps.run.outputs.publish == 'true'
