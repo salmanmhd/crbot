@@ -1,0 +1,19 @@
+services:
+  paper:
+    build: .
+    container_name: paper-lab
+    # on-failure (not unless-stopped): after the 48h run finishes the process exits 0 and must STAY stopped.
+    restart: on-failure
+    volumes:
+      - ./data:/data
+    environment:
+      - PAPER_PROVIDER=binance        # or: coinbase
+  dashboard:
+    build: .
+    container_name: paper-lab-dashboard
+    command: ["node", "--no-warnings", "src/cli.ts", "serve", "--out", "/data", "--port", "8080"]
+    restart: unless-stopped
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "8080:8080"

@@ -1,0 +1,26 @@
+{
+  "name": "paper-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-strategy crypto PAPER-trading experiment (no real money, public market data only)",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "plan": "node --no-warnings src/cli.ts plan",
+    "backtest": "node --no-warnings src/cli.ts backtest",
+    "backtest:synthetic": "node --no-warnings src/cli.ts backtest --synthetic --out out-synth",
+    "init": "node --no-warnings src/cli.ts init",
+    "tick": "node --no-warnings src/cli.ts tick",
+    "run": "node --no-warnings src/cli.ts run",
+    "serve": "node --no-warnings src/cli.ts serve",
+    "sim": "node --no-warnings src/cli.ts sim --out out-sim",
+    "test": "node --no-warnings --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.8.3"
+  }
+}

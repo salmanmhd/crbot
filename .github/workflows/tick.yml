@@ -1,0 +1,122 @@
+name: paper-tick
+
+# Runs one "catch-up tick" every 5 minutes. GitHub cron can be late or skip runs; that is harmless because each
+# tick processes EVERY candle that closed since the last processed one (per-series cursors stored in SQLite).
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to do'
+        type: choice
+        default: tick
+        options: [check, backtest, start, tick, reset]
+      confirm_reset:
+        description: 'Type RESET to delete all experiment state (only for action=reset)'
+        required: false
+        default: ''
+
+# Two runs must never overlap: they would both rewrite the state branch.
+concurrency:
+  group: paper-lab-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write     # push the paper-state branch
+  actions: write      # auto-disable this workflow once the 48h run is finished
+  pages: write
+  id-token: write
+
+env:
+  ACTION: ${{ github.event.inputs.action || 'tick' }}
+  # Optional: set repo variable LOOP_SECONDS=240 (public repos) to tick every minute inside each run => on-time fills.
+  LOOP_SECONDS: ${{ vars.LOOP_SECONDS || '0' }}
+  KEEP_HISTORY: ${{ vars.KEEP_HISTORY || '0' }}
+  PAPER_PROVIDER: ${{ vars.PAPER_PROVIDER || 'binance' }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      publish: ${{ steps.run.outputs.publish }}
+      site: ${{ steps.run.outputs.site }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Reset state (explicit action only)
+        if: env.ACTION == 'reset'
+        run: |
+          [ "${{ github.event.inputs.confirm_reset }}" = "RESET" ] || { echo "type RESET in confirm_reset"; exit 1; }
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete paper-state || true
+          echo "paper-state deleted"
+
+      - name: Restore state
+        if: env.ACTION != 'reset'
+        run: scripts/state-restore.sh out
+
+      - name: Run
+        id: run
+        if: env.ACTION != 'reset'
+        run: |
+          node --version
+          case "$ACTION" in
+            check)    node --no-warnings src/cli.ts check ; echo "publish=false" >> "$GITHUB_OUTPUT" ; exit 0 ;;
+            backtest) node --no-warnings src/cli.ts backtest --out out ; echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            start)    node --no-warnings src/cli.ts init --out out
+                      node --no-warnings src/cli.ts tick --out out --loop-seconds "$LOOP_SECONDS" ;;
+            *)        node --no-warnings src/cli.ts tick --out out --loop-seconds "$LOOP_SECONDS" ;;
+          esac
+          STATUS=$(cat out/.status 2>/dev/null || echo none)
+          echo "status=$STATUS"
+          rm -f out/.status
+          if [ "$ACTION" != "backtest" ]; then
+            case "$STATUS" in
+              not_initialized|finished|none) echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+              *) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+          echo "$STATUS" > status.txt
+          [ -f out/index.html ] && echo "site=true" >> "$GITHUB_OUTPUT" || true
+
+      - name: Publish state to the paper-state branch
+        if: steps.run.outputs.publish == 'true'
+        run: scripts/state-publish.sh out
+
+      - name: Build static site (dashboard + data + reports, NOT the database)
+        if: steps.run.outputs.publish == 'true' && steps.run.outputs.site == 'true'
+        run: |
+          mkdir -p site
+          rsync -a --exclude state --exclude .git out/ site/
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.run.outputs.publish == 'true' && steps.run.outputs.site == 'true'
+        with:
+          path: site
+
+      - name: Stop the schedule after the 48h run has finished
+        if: steps.run.outputs.publish == 'true'
+        continue-on-error: true
+        run: |
+          if [ "$(cat status.txt)" = "just_finished" ]; then
+            echo "Run finished: disabling the schedule (re-enable from the Actions tab to start another run)."
+            gh workflow disable paper-tick || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: tick
+    if: needs.tick.outputs.publish == 'true' && needs.tick.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true      # a Pages hiccup must never fail a tick (state is already saved)
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper Lab</title>
+<meta name="description" content="Multi-strategy crypto paper-trading experiment leaderboard">
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:#f6f7f9;--card:#fff;--fg:#16191d;--mut:#5d6773;--bd:#dde1e7;--hd:#eef1f5;--acc:#2a6fdb;
+  --pos:#12794a;--neg:#b42318;--warn:#9a5b00;--base:#fff4d6;--base-bd:#e9c46a;--shadow:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#101316;--card:#171b20;--fg:#e8ebef;--mut:#9aa5b1;--bd:#2a3037;--hd:#1d2329;--acc:#6aa3ff;
+  --pos:#4ade80;--neg:#ff7b72;--warn:#f0b24a;--base:#33290f;--base-bd:#7a6020;--shadow:none;}}
+:root[data-theme="dark"]{--bg:#101316;--card:#171b20;--fg:#e8ebef;--mut:#9aa5b1;--bd:#2a3037;--hd:#1d2329;--acc:#6aa3ff;--pos:#4ade80;--neg:#ff7b72;--warn:#f0b24a;--base:#33290f;--base-bd:#7a6020;--shadow:none}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:14px 16px 6px;max-width:1200px;margin:0 auto}
+h1{font-size:1.25rem;margin:0 0 2px}
+.sub{color:var(--mut);font-size:.85rem}
+main{max-width:1200px;margin:0 auto;padding:0 16px 40px}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.78rem;font-weight:600;border:1px solid var(--bd);background:var(--hd)}
+.chip.ok{color:var(--pos)}.chip.bad{color:var(--neg)}.chip.warn{color:var(--warn)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow)}
+.grid.compact{grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.grid.compact .card{padding:6px 9px}.grid.compact .v{font-size:.95rem}.grid.compact .k{font-size:.66rem}
+.kv{grid-template-columns:repeat(auto-fit,minmax(104px,1fr))!important}.kv .card{padding:6px 9px}.kv .v{font-size:.98rem}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 2px 0;font-size:.74rem;color:var(--mut)}.legend i{display:inline-block;width:14px;height:3px;margin-right:5px;vertical-align:middle;border-radius:2px}
+.card .k{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.card .v{font-size:1.1rem;font-weight:650;margin-top:2px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
+nav button{flex:0 0 auto;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer;min-height:40px}
+nav button[aria-selected="true"]{background:var(--acc);color:#fff;border-color:var(--acc)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+select,input[type=search]{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 8px;min-height:40px;max-width:100%}
+.tw{overflow:auto;border:1px solid var(--bd);border-radius:10px;background:var(--card);max-height:75vh}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:.83rem}
+th,td{padding:6px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--bd)}
+th{position:sticky;top:0;background:var(--hd);cursor:pointer;user-select:none;z-index:2;font-weight:650}
+th.l,td.l{text-align:left}
+td.l.sticky,th.l.sticky{position:sticky;left:0;z-index:1;background:var(--card);max-width:46vw;overflow:hidden;text-overflow:ellipsis}
+th.l.sticky{background:var(--hd);z-index:3}
+tr.base td{background:var(--base)}
+tr.base td.sticky{background:var(--base)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{filter:brightness(.97)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.tag{font-size:.65rem;border:1px solid var(--base-bd);border-radius:4px;padding:0 4px;margin-left:5px;color:var(--warn);vertical-align:middle}
+.tag.of{border-color:var(--neg);color:var(--neg)}
+.note{color:var(--mut);font-size:.82rem;margin:8px 0}
+.chartbox{position:relative;height:340px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px}
+dialog{width:min(980px,100vw);max-width:100vw;max-height:100vh;border:0;border-radius:12px 12px 0 0;padding:0;background:var(--bg);color:var(--fg);margin:auto auto 0}
+@media(min-width:760px){dialog{margin:auto;border-radius:12px;max-height:92vh}}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:5}
+.dh b{word-break:break-all;font-size:.9rem}
+.db{padding:12px 14px 20px;overflow:auto;max-height:80vh}
+button.x{border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer;min-height:40px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
+.err{white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;background:var(--hd);padding:8px;border-radius:8px;overflow:auto}
+a{color:var(--acc)}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Paper Lab <span id="status" class="chip">loading…</span></h1>
+  <div class="sub" id="meta">Paper trading only — no real money, no orders. Public market data.</div>
+</header>
+<main>
+  <div class="grid compact" id="health"></div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="board" aria-selected="true">Leaderboard</button>
+    <button role="tab" data-tab="top">Top 10 vs hold</button>
+    <button role="tab" data-tab="bt">Backtest vs live</button>
+    <button role="tab" data-tab="run">Run health</button>
+  </nav>
+
+  <section id="tab-board">
+    <div class="filters">
+      <input type="search" id="q" placeholder="Filter bots (e.g. sma, ETH)…" aria-label="Filter bots">
+      <select id="f-strat" aria-label="Strategy"><option value="">All strategies</option></select>
+      <select id="f-int" aria-label="Interval"><option value="">All intervals</option></select>
+      <select id="f-sym" aria-label="Symbol"><option value="">All symbols</option></select>
+      <select id="f-fee" aria-label="Fee profile"><option value="">All fees</option></select>
+    </div>
+    <div class="tw"><table id="board"><thead></thead><tbody></tbody></table></div>
+    <p class="note">Highlighted rows are baselines (buy &amp; hold, random). All returns are after fees, spread+slippage; “after tax” also applies 1% TDS (locked, refundable) and 30%+4% cess on each profitable closed trade, valued as if open positions were sold now. Tap a row for its equity curve, trades and backtest comparison. <b>Short window = mostly noise.</b></p>
+  </section>
+
+  <section id="tab-top" class="hidden">
+    <div class="chartbox" style="height:380px"><canvas id="c-top"></canvas></div>
+    <div class="legend" id="lg-top"></div>
+    <p class="note">Return since start for the 10 best bots (solid) against buy &amp; hold of each coin (dashed, grey/black).</p>
+  </section>
+
+  <section id="tab-bt" class="hidden">
+    <div id="bt-empty" class="note hidden">No backtest file found (data/backtest.json). Run the backtest phase first.</div>
+    <div class="tw"><table id="bttable"><thead></thead><tbody></tbody></table></div>
+    <p class="note">“BT 48h” = mean return over every rolling 48h window in the backtest, with its 10th–90th percentile band. Gap = live − BT 48h mean; z = gap ÷ BT std. ⚠ = flagged overfit (top 30% on days 1–60, bottom 30% on days 61–90).</p>
+  </section>
+
+  <section id="tab-run" class="hidden">
+    <div class="grid" id="health2"></div>
+    <h3>Gaps (missing candles)</h3><div id="gaps" class="note"></div>
+    <h3>Recent errors</h3><div id="errors" class="err"></div>
+    <div id="reports" class="note"></div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <div class="dh"><b id="d-title"></b><button class="x" id="d-close">Close</button></div>
+  <div class="db">
+    <div class="chartbox" style="height:240px"><canvas id="c-bot"></canvas></div>
+    <div class="legend" id="lg-bot"></div>
+    <div class="kv" id="d-kv"></div>
+    <h3>Backtest vs live</h3><div id="d-bt" class="note"></div>
+    <h3>Trades <span id="d-nt" class="sub"></span></h3>
+    <div class="tw"><table id="d-trades"><thead></thead><tbody></tbody></table></div>
+  </div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (x, d=2) => (x==null || !isFinite(x)) ? '—' : (x>=0?'+':'') + (x*100).toFixed(d) + '%';
+const upct = (x, d=1) => (x==null || !isFinite(x)) ? '—' : (x*100).toFixed(d) + '%';
+const num = (x, d=2) => (x==null || !isFinite(x)) ? '—' : Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const cls = x => x==null||!isFinite(x)||x===0 ? '' : (x>0?'pos':'neg');
+const ago = ms => { const m = Math.round(ms/60000); return m<1?'<1 min ago':m<90?m+' min ago':(m/60).toFixed(1)+' h ago'; };
+const tfmt = t => new Date(t).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const PAL = ['#2a78d6','#e0701a','#2a9d5a','#b43fb8','#d1a000','#00a3b3','#d03a3a','#6c5ce7','#8a6d3b','#3a8f8f'];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+let D = {lb:null, eq:null, tr:null, hl:null, bt:null}, btMap = new Map();
+let sort = {key:'retAfter', dir:-1}, btSort = {key:'live', dir:-1};
+let charts = {};
+
+async function getJSON(p, optional){
+  try { const r = await fetch(p + (p.includes('?')?'&':'?') + 't=' + Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error(r.status); return await r.json(); }
+  catch(e){ if(optional) return null; throw e; }
+}
+
+async function load(){
+  try{
+    const [lb, eq, tr, hl, bt] = await Promise.all([getJSON('data/leaderboard.json'), getJSON('data/equity.json'), getJSON('data/trades.json'), getJSON('data/health.json'), getJSON('data/backtest.json', true)]);
+    D = {lb, eq, tr, hl, bt};
+    btMap = new Map((bt ? bt.rows : []).map(r => [r.id, r]));
+    render();
+  }catch(e){
+    $('#status').textContent = 'no data yet'; $('#status').className = 'chip warn';
+    $('#meta').textContent = 'Could not load data/leaderboard.json — the run may not have started yet. (' + e.message + ')';
+  }
+}
+
+function render(){
+  const {lb, hl} = D;
+  const st = $('#status'), now = Date.now();
+  const finished = lb.run.status === 'finished';
+  const stale = !finished && hl.lastTick && (now - hl.lastTick) > 25*60000;
+  st.textContent = finished ? 'finished' : stale ? 'stale?' : 'running';
+  st.className = 'chip ' + (finished ? 'ok' : stale ? 'bad' : 'ok');
+  $('#meta').textContent = `${lb.rows.length} bots · ${lb.run.source} data · started ${tfmt(lb.run.startAt)} · ends ${tfmt(lb.run.endAt)} · ${lb.run.elapsedH.toFixed(1)}h elapsed · snapshot ${tfmt(lb.generatedAt)}`;
+  const cards = [
+    ['Last tick', hl.lastTick ? (finished ? tfmt(hl.lastTick) : ago(now - hl.lastTick)) : '—', stale ? 'neg' : ''],
+    ['Ticks', hl.ticks], ['Candles processed', hl.candlesProcessed],
+    ['Missed candles', hl.missedCandles, hl.missedCandles ? 'neg' : 'pos'],
+    ['Errors', hl.errorCount, hl.errorCount ? 'warn' : ''],
+    ['Longest tick gap', (hl.maxBehindMs/60000).toFixed(1) + ' min'],
+  ];
+  const html = cards.map(c => `<div class="card"><div class="k">${c[0]}</div><div class="v ${c[2]||''}">${esc(c[1])}</div></div>`).join('');
+  const mini = c => `<div class="card"><div class="k">${c[0]}</div><div class="v ${c[2]||''}">${esc(c[1])}</div></div>`;
+  $('#health').innerHTML = [cards[0], cards[3], cards[4]].map(mini).join(''); $('#health2').innerHTML = html;
+  $('#gaps').innerHTML = hl.gaps.length ? hl.gaps.map(g => `${esc(g.symbol)} ${esc(g.interval)}: ${g.missing} missing from ${tfmt(g.fromOpen)}`).join('<br>') : 'None detected.';
+  $('#errors').textContent = hl.recentErrors.length ? hl.recentErrors.map(e => `${new Date(e.ts).toISOString()}  [${e.scope}]  ${e.message}`).join('\n') : 'None.';
+  $('#reports').innerHTML = finished ? '<p><b>Final report:</b> <a href="report/final.html">HTML</a> · <a href="report/final.md">Markdown</a></p>' : '<p>The final report appears here when the run ends.</p>';
+  fillFilters(); drawBoard(); drawBt(); if(!$('#tab-top').classList.contains('hidden')) drawTop();
+}
+
+function fillFilters(){
+  const rows = D.lb.rows;
+  const opt = (id, vals) => { const el = $(id), cur = el.value; const first = el.options[0].outerHTML; el.innerHTML = first + [...new Set(vals)].sort().map(v => `<option>${esc(v)}</option>`).join(''); el.value = cur; };
+  opt('#f-strat', rows.map(r=>r.strategy)); opt('#f-int', rows.map(r=>r.interval)); opt('#f-sym', rows.map(r=>r.symbol)); opt('#f-fee', rows.map(r=>r.fee));
+}
+
+const COLS = [
+  ['rankAfter','#',false,v=>v], ['id','Bot',true,null],
+  ['retAfter','After tax',false,v=>pct(v),true], ['retBefore','Before tax',false,v=>pct(v),true],
+  ['vsBH','vs B&H',false,v=>pct(v),true], ['vsRandom','vs random',false,v=>pct(v),true],
+  ['trades','Trades',false,v=>v], ['winRate','Win %',false,v=>v==null?'—':(v*100).toFixed(0)+'%'],
+  ['avgWin','Avg win',false,v=>num(v)], ['avgLoss','Avg loss',false,v=>num(v)], ['profitFactor','PF',false,v=>v==null?'—':v.toFixed(2)],
+  ['maxDD','Max DD',false,v=>upct(v)], ['sharpe','Sharpe*',false,v=>num(v)],
+  ['fees','Fees',false,v=>num(v)], ['slippage','Slippage',false,v=>num(v)], ['tax','Tax',false,v=>num(v)], ['tdsLocked','TDS locked',false,v=>num(v)],
+];
+
+function drawBoard(){
+  const q = $('#q').value.trim().toLowerCase(), fs=$('#f-strat').value, fi=$('#f-int').value, fy=$('#f-sym').value, ff=$('#f-fee').value;
+  let rows = D.lb.rows.filter(r => (!fs||r.strategy===fs)&&(!fi||r.interval===fi)&&(!fy||r.symbol===fy)&&(!ff||r.fee===ff)&&(!q||r.id.toLowerCase().includes(q)));
+  const k = sort.key;
+  rows = [...rows].sort((a,b) => { const x=a[k], y=b[k]; if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (typeof x==='string' ? x.localeCompare(y) : x-y) * sort.dir; });
+  $('#board thead').innerHTML = '<tr>' + COLS.map(c => `<th class="${c[2]?'l sticky':''}" data-k="${c[0]}" aria-sort="${sort.key===c[0]?(sort.dir>0?'ascending':'descending'):'none'}">${c[1]}${sort.key===c[0]?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('') + '</tr>';
+  $('#board tbody').innerHTML = rows.map(r => '<tr data-id="' + esc(r.id) + '" class="' + (r.baseline?'base':'') + '">' + COLS.map(c => {
+    if(c[0]==='id') return `<td class="l sticky">${esc(r.id)}${r.baseline?'<span class="tag">baseline</span>':''}${btMap.get(r.id)?.overfit?'<span class="tag of">overfit?</span>':''}</td>`;
+    const v = r[c[0]]; return `<td class="${c[4]?cls(v):''}">${c[3](v)}</td>`;
+  }).join('') + '</tr>').join('') || '<tr><td colspan="99" class="l">No bots match.</td></tr>';
+}
+
+function drawBt(){
+  const has = D.bt && D.bt.rows.length;
+  $('#bt-empty').classList.toggle('hidden', !!has);
+  if(!has){ $('#bttable thead').innerHTML=''; $('#bttable tbody').innerHTML=''; return; }
+  const rows = D.lb.rows.map(r => { const b = btMap.get(r.id); if(!b) return null;
+    const gap = r.retAfter - b.w48.mean; return {id:r.id, baseline:r.baseline, b, live:r.retAfter, gap, z: b.w48.std>0 ? gap/b.w48.std : null}; }).filter(Boolean);
+  const k = btSort.key;
+  const val = (x) => k==='id'?x.id : k==='live'?x.live : k==='gap'?x.gap : k==='z'?x.z : k==='bt90'?x.b.retAfter : k==='s1'?x.b.seg1.after : k==='s2'?x.b.seg2.after : k==='w48'?x.b.w48.mean : x.live;
+  rows.sort((a,c) => { const p=val(a), q=val(c); if(p==null) return 1; if(q==null) return -1; return (typeof p==='string'?p.localeCompare(q):p-q)*btSort.dir; });
+  const H = [['id','Bot',1],['live','Live 48h',0],['w48','BT 48h mean',0],['band','BT p10…p90',0],['gap','Gap',0],['z','z',0],['bt90','BT 90d',0],['s1','BT d1–60',0],['s2','BT d61–90',0]];
+  $('#bttable thead').innerHTML = '<tr>' + H.map(h => `<th class="${h[2]?'l sticky':''}" data-k="${h[0]}">${h[1]}${btSort.key===h[0]?(btSort.dir>0?' ▲':' ▼'):''}</th>`).join('') + '</tr>';
+  $('#bttable tbody').innerHTML = rows.map(x => `<tr data-id="${esc(x.id)}" class="${x.baseline?'base':''}"><td class="l sticky">${esc(x.id)}${x.b.overfit?'<span class="tag of">⚠ overfit</span>':''}</td>
+    <td class="${cls(x.live)}">${pct(x.live)}</td><td class="${cls(x.b.w48.mean)}">${pct(x.b.w48.mean)}</td><td>${pct(x.b.w48.p10,1)} … ${pct(x.b.w48.p90,1)}</td>
+    <td class="${cls(x.gap)}">${pct(x.gap)}</td><td>${x.z==null?'—':x.z.toFixed(2)}</td><td class="${cls(x.b.retAfter)}">${pct(x.b.retAfter)}</td>
+    <td class="${cls(x.b.seg1.after)}">${pct(x.b.seg1.after)}</td><td class="${cls(x.b.seg2.after)}">${pct(x.b.seg2.after)}</td></tr>`).join('');
+}
+
+function mkChart(id, cfg){ if(charts[id]) charts[id].destroy(); charts[id] = new Chart($('#'+id), cfg); return charts[id]; }
+function chartBase(){
+  const fg = css('--mut'), grid = css('--bd'), start = D.lb.run.startAt;
+  const end = D.lb.run.status==='finished' ? D.lb.run.endAt : Math.max(D.lb.generatedAt, start + 3600000);
+  const step = Math.max(1, Math.ceil((end-start)/3600000/6)) * 3600000;
+  return {responsive:true, maintainAspectRatio:false, animation:false, interaction:{mode:'nearest',intersect:false},
+    scales:{ x:{type:'linear', min:start, max:end, ticks:{color:fg, stepSize:step, maxTicksLimit:9, callback:v => '+' + ((v-start)/3600000).toFixed(0) + 'h'}, grid:{color:grid}},
+             y:{ticks:{color:fg, callback:v => (v>=0?'+':'') + v.toFixed(1) + '%'}, grid:{color:grid}} },
+    plugins:{legend:{display:false}, tooltip:{callbacks:{title:i => tfmt(i[0].parsed.x), label:c => `${c.dataset.label}: ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(2)}%`}}}};
+}
+const series = (id, label, color, dash, w) => {
+  const init = D.lb.run.initialCash, pts = (D.eq[id]||[]).map(p => ({x:p[0], y:(p[1]/init-1)*100}));
+  pts.unshift({x:D.lb.run.startAt, y:0});
+  return {label, data:pts, borderColor:color, backgroundColor:color, borderWidth:w||1.6, pointRadius:0, borderDash:dash||[], tension:0};
+};
+function drawTop(){
+  const rows = D.lb.rows, init = D.lb.run.initialCash;
+  const top = rows.filter(r => !r.baseline).slice(0,10);
+  const holds = rows.filter(r => r.strategy==='buyAndHold' && r.fee==='default');
+  const ds = top.map((r,i) => series(r.id, `#${r.rankAfter} ${r.id}`, PAL[i%PAL.length]));
+  const grey = [css('--fg'), '#8a94a0', '#b6bec8'];
+  holds.forEach((h,i) => ds.push(series(h.id, `HOLD ${h.symbol.replace('USDT','')}`, grey[i%3], [6,4], 2)));
+  mkChart('c-top', {type:'line', data:{datasets:ds}, options:chartBase()});
+  $('#lg-top').innerHTML = ds.map(d => `<span><i style="background:${d.borderColor}${d.borderDash.length?';opacity:.7':''}"></i>${esc(d.label)}</span>`).join('');
+}
+
+function openBot(id){
+  const r = D.lb.rows.find(x => x.id===id); if(!r) return;
+  $('#d-title').textContent = id;
+  const kv = [['After tax', pct(r.retAfter), cls(r.retAfter)], ['Before tax', pct(r.retBefore), cls(r.retBefore)], ['vs buy & hold', pct(r.vsBH), cls(r.vsBH)], ['vs random', pct(r.vsRandom), cls(r.vsRandom)],
+    ['Rank (after / before tax)', r.rankAfter + ' / ' + r.rankBefore, ''], ['Win rate', r.winRate==null?'—':(r.winRate*100).toFixed(0)+'%', ''], ['Profit factor', r.profitFactor==null?'—':r.profitFactor.toFixed(2), ''],
+    ['Max drawdown', upct(r.maxDD), ''], ['Fees', num(r.fees), ''], ['Slippage', num(r.slippage), ''], ['Tax charged', num(r.tax), ''], ['TDS locked', num(r.tdsLocked), ''], ['Open position', r.open?'yes':'no', '']];
+  $('#d-kv').innerHTML = kv.map(k => `<div class="card"><div class="k">${k[0]}</div><div class="v ${k[2]}">${k[1]}</div></div>`).join('');
+  const hold = D.lb.rows.find(x => x.strategy==='buyAndHold' && x.symbol===r.symbol && x.fee===r.fee);
+  const ds = [series(id, 'this bot (after tax)', PAL[0], [], 2.2)];
+  if(hold && hold.id!==id) ds.push(series(hold.id, 'buy & hold ' + r.symbol.replace('USDT',''), css('--fg'), [6,4], 1.6));
+  mkChart('c-bot', {type:'line', data:{datasets:ds}, options:chartBase()});
+  $('#lg-bot').innerHTML = ds.map(d => `<span><i style="background:${d.borderColor}"></i>${esc(d.label)}</span>`).join('');
+  const b = btMap.get(id);
+  $('#d-bt').innerHTML = b ? `Backtest ${D.bt.days}d after tax <b class="${cls(b.retAfter)}">${pct(b.retAfter)}</b> (days 1–${D.bt.splitDay}: ${pct(b.seg1.after)}, ${D.bt.splitDay+1}–${D.bt.days}: ${pct(b.seg2.after)}), ${b.trades} trades, win ${b.winRate==null?'—':(b.winRate*100).toFixed(0)+'%'}, max DD ${upct(b.maxDD)}, Sharpe ${num(b.sharpe)}.<br>
+    Typical 48h window in backtest: mean ${pct(b.w48.mean)} (p10 ${pct(b.w48.p10)}, p90 ${pct(b.w48.p90)}). Live so far: <b class="${cls(r.retAfter)}">${pct(r.retAfter)}</b>${b.overfit?' · <b class="neg">flagged as likely overfit</b>':''}.` : 'No backtest data for this bot.';
+  const tr = D.tr[id] || [];
+  $('#d-nt').textContent = '(' + tr.length + ')';
+  $('#d-trades thead').innerHTML = '<tr>' + ['Opened','Closed','Qty','Entry','Exit','Net P&L','Tax','TDS','Why','Fill'].map(h => `<th>${h}</th>`).join('') + '</tr>';
+  $('#d-trades tbody').innerHTML = tr.slice().reverse().map(t => `<tr style="cursor:default"><td>${tfmt(t[0])}</td><td>${tfmt(t[1])}</td><td>${t[2]}</td><td>${num(t[3],4)}</td><td>${num(t[4],4)}</td><td class="${cls(t[5])}">${num(t[5])}</td><td>${num(t[6])}</td><td>${num(t[7])}</td><td>${esc(t[8])}</td><td>${esc(t[9])}</td></tr>`).join('') || '<tr style="cursor:default"><td colspan="10" class="l">No closed trades yet.</td></tr>';
+  const dlg = $('#dlg'); if(!dlg.open) dlg.showModal();
+}
+
+// ---- events
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x===b));
+  ['board','top','bt','run'].forEach(t => $('#tab-'+t).classList.toggle('hidden', t!==b.dataset.tab));
+  if(b.dataset.tab==='top' && D.lb) drawTop(); });
+$('#board thead').addEventListener('click', e => { const th = e.target.closest('th'); if(!th) return; const k = th.dataset.k; sort = {key:k, dir: sort.key===k ? -sort.dir : (k==='id'||k==='rankAfter'?1:-1)}; drawBoard(); });
+$('#bttable thead').addEventListener('click', e => { const th = e.target.closest('th'); if(!th || th.dataset.k==='band') return; const k = th.dataset.k; btSort = {key:k, dir: btSort.key===k ? -btSort.dir : (k==='id'?1:-1)}; drawBt(); });
+for(const id of ['#q','#f-strat','#f-int','#f-sym','#f-fee']) $(id).addEventListener('input', () => D.lb && drawBoard());
+for(const t of ['#board tbody','#bttable tbody']) $(t).addEventListener('click', e => { const tr = e.target.closest('tr'); if(tr && tr.dataset.id) openBot(tr.dataset.id); });
+$('#d-close').addEventListener('click', () => $('#dlg').close());
+$('#dlg').addEventListener('click', e => { if(e.target.id==='dlg') $('#dlg').close(); });
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => D.lb && render());
+
+load(); setInterval(load, 60000);
+})();
+</script>
+</body>
+</html>
