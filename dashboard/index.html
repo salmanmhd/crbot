@@ -151,7 +151,7 @@ const WHY = {signal:'strategy signal', sl:'stop-loss', tp:'take-profit'};
 const num = (x, d=2) => (x==null || !isFinite(x)) ? '—' : Number(x).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const cls = x => x==null||!isFinite(x)||x===0 ? '' : (x>0?'pos':'neg');
 const ago = ms => { const m = Math.round(ms/60000); return m<1?'<1 min ago':m<90?m+' min ago':(m/60).toFixed(1)+' h ago'; };
-const tfmt = t => new Date(t).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+const tfmt = t => new Date(t).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true}) + ' IST';
 const PAL = ['#2a78d6','#e0701a','#2a9d5a','#b43fb8','#d1a000','#00a3b3','#d03a3a','#6c5ce7','#8a6d3b','#3a8f8f'];
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -196,7 +196,7 @@ function render(){
   const mini = c => `<div class="card"><div class="k">${c[0]}</div><div class="v ${c[2]||''}">${esc(c[1])}</div></div>`;
   $('#health').innerHTML = [cards[0], cards[3], cards[4]].map(mini).join(''); $('#health2').innerHTML = html;
   $('#gaps').innerHTML = hl.gaps.length ? hl.gaps.map(g => `${esc(g.symbol)} ${esc(g.interval)}: ${g.missing} missing from ${tfmt(g.fromOpen)}`).join('<br>') : 'None detected.';
-  $('#errors').textContent = hl.recentErrors.length ? hl.recentErrors.map(e => `${new Date(e.ts).toISOString()}  [${e.scope}]  ${e.message}`).join('\n') : 'None.';
+  $('#errors').textContent = hl.recentErrors.length ? hl.recentErrors.map(e => `${tfmt(e.ts)}  [${e.scope}]  ${e.message}`).join('\n') : 'None.';
   $('#reports').innerHTML = finished ? '<p><b>Final report:</b> <a href="report/final.html">HTML</a> · <a href="report/final.md">Markdown</a></p>' : '<p>The final report appears here when the run ends.</p>';
   walletNote(); fillFilters(); drawBoard(); drawBt(); if(!$('#tab-top').classList.contains('hidden')) drawTop();
 }

@@ -79,11 +79,12 @@ export function buildLeaderboard(store: Store, cfg: Config, now: number): Leader
 
 const pc = (x: number | null | undefined, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : `${(x * 100).toFixed(d)}%`);
 const f2 = (x: number | null) => (x === null || !Number.isFinite(x) ? '—' : x.toFixed(2));
+const ist = (t: number) => new Date(t + 19_800_000).toISOString().replace('T', ' ').slice(0, 16) + ' IST';
 const iso = (t: number) => new Date(t).toISOString().replace('.000Z', 'Z');
 
 export function leaderboardMarkdown(lb: Leaderboard, top = 25): string {
-  const L = [`# Leaderboard — ${iso(lb.generatedAt)}`, '',
-    `Run: ${iso(lb.run.startAt)} → ${iso(lb.run.endAt)} · status **${lb.run.status}** · elapsed ${lb.run.elapsedH.toFixed(1)}h · data: ${lb.run.source} · ${lb.rows.length} bots`, '',
+  const L = [`# Leaderboard — ${ist(lb.generatedAt)}`, '',
+    `Run: ${ist(lb.run.startAt)} → ${ist(lb.run.endAt)} · status **${lb.run.status}** · elapsed ${lb.run.elapsedH.toFixed(1)}h · data: ${lb.run.source} · ${lb.rows.length} bots`, '',
     '| # | bot | after tax | before tax | vs B&H | vs random | trades | win% | maxDD | fees | tax | TDS locked |', '|---|---|---|---|---|---|---|---|---|---|---|---|'];
   const show = lb.rows.slice(0, top);
   for (const r of show) L.push(`| ${r.rankAfter} | ${r.baseline ? '**' + r.id + '**' : r.id} | ${pc(r.retAfter)} | ${pc(r.retBefore)} | ${pc(r.vsBH)} | ${pc(r.vsRandom)} | ${r.trades} | ${pc(r.winRate, 0)} | ${pc(r.maxDD)} | ${f2(r.fees)} | ${f2(r.tax)} | ${f2(r.tdsLocked)} |`);
@@ -108,7 +109,7 @@ export function finalReportMarkdown(lb: Leaderboard, health: ReturnType<Store['h
   const L: string[] = [];
   const hours = lb.run.elapsedH;
   L.push(`# Final report — ${rows.length}-bot paper-trading experiment`, '',
-    `Window: **${iso(lb.run.startAt)} → ${iso(lb.run.endAt)}** (${hours.toFixed(1)}h) · data: ${lb.run.source} · wallet per bot: ${lb.run.initialCash.toLocaleString()} · all numbers are PAPER results after fees, slippage, spread and Indian tax (liquidation basis — open positions are valued as if sold now, including the tax that sale would trigger).`, '');
+    `Window: **${ist(lb.run.startAt)} → ${ist(lb.run.endAt)}** (${hours.toFixed(1)}h; UTC ${iso(lb.run.startAt)}) · data: ${lb.run.source} · wallet per bot: ${lb.run.initialCash.toLocaleString()} · all numbers are PAPER results after fees, slippage, spread and Indian tax (liquidation basis — open positions are valued as if sold now, including the tax that sale would trigger).`, '');
 
   // ---- verdict
   const beatBH = strat.filter((r) => r.vsBH > 0), beatRand = strat.filter((r) => r.vsRandom !== null && r.vsRandom > 0);
