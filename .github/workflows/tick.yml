@@ -17,10 +17,8 @@ on:
         required: false
         default: ''
 
-# Two runs must never overlap: they would both rewrite the state branch.
-concurrency:
-  group: paper-lab-state
-  cancel-in-progress: false
+# NOTE: the 'one tick at a time' lock lives on the tick JOB (below), not on the workflow, so a slow/queued Pages
+# deploy can never block the next tick. Two ticks must never overlap: they would both rewrite the state branch.
 
 permissions:
   contents: write     # push the paper-state branch
@@ -43,7 +41,10 @@ env:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
+    concurrency:
+      group: paper-lab-state
+      cancel-in-progress: false
     outputs:
       publish: ${{ steps.run.outputs.publish }}
       site: ${{ steps.run.outputs.site }}
@@ -92,35 +93,40 @@ jobs:
         if: steps.run.outputs.publish == 'true'
         run: scripts/state-publish.sh out
 
+      - name: Chain the next run (does not depend on cron; runs even if later/earlier steps failed)
+        if: ${{ !cancelled() && env.ACTION != 'backtest' && env.ACTION != 'check' && env.ACTION != 'reset' }}
+        continue-on-error: true
+        run: |
+          STATUS=$(cat status.txt 2>/dev/null || echo failed)
+          echo "status=$STATUS chain=$CHAIN"
+          [ "$CHAIN" = "1" ] || exit 0
+          case "$STATUS" in
+            just_finished|finished|not_initialized) echo "not chaining ($STATUS)"; exit 0 ;;
+            ok) ;;
+            *) echo "previous step failed ($STATUS): waiting 60s before retrying so a persistent error cannot spin"; sleep 60 ;;
+          esac
+          for i in 1 2 3; do
+            if gh workflow run tick.yml --ref "${GITHUB_REF_NAME}" -f action=tick; then echo "next run dispatched"; exit 0; fi
+            sleep $((i*5))
+          done
+          echo "::warning title=Chain failed::could not dispatch the next run (the 5-minute cron is the fallback)"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build static site (dashboard + data + reports, NOT the database)
         if: steps.run.outputs.publish == 'true' && steps.run.outputs.site == 'true'
+        continue-on-error: true
         run: |
           mkdir -p site
           rsync -a --exclude state --exclude .git out/ site/
       - uses: actions/upload-pages-artifact@v3
         if: steps.run.outputs.publish == 'true' && steps.run.outputs.site == 'true'
+        continue-on-error: true
         with:
           path: site
 
-      - name: Chain the next run (does not depend on cron)
-        if: steps.run.outputs.publish == 'true' && env.ACTION != 'backtest'
-        continue-on-error: true
-        run: |
-          STATUS=$(cat status.txt)
-          if [ "$STATUS" = "ok" ] && [ "$CHAIN" = "1" ]; then
-            if gh workflow run tick.yml --ref "${GITHUB_REF_NAME}" -f action=tick; then
-              echo "next run dispatched (queued behind this one by the concurrency group)"
-            else
-              echo "::warning title=Chain failed::could not dispatch the next run (the 5-minute cron is the fallback)"
-            fi
-          else
-            echo "not chaining (status=$STATUS chain=$CHAIN)"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Stop the schedule after the 48h run has finished
-        if: steps.run.outputs.publish == 'true'
+        if: ${{ !cancelled() && steps.run.outputs.publish == 'true' }}
         continue-on-error: true
         run: |
           if [ "$(cat status.txt)" = "just_finished" ]; then
@@ -135,6 +141,9 @@ jobs:
     if: needs.tick.outputs.publish == 'true' && needs.tick.outputs.site == 'true'
     runs-on: ubuntu-latest
     continue-on-error: true      # a Pages hiccup must never fail a tick (state is already saved)
+    concurrency:
+      group: paper-lab-pages
+      cancel-in-progress: true   # only the newest dashboard matters; never queue behind an older one
     environment:
       name: github-pages
       url: ${{ steps.d.outputs.page_url }}
